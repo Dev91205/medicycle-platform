@@ -8,9 +8,12 @@ export default function Register() {
     username: '',
     email: '',
     password: '',
-    role: 'pharmacy' // Default role
+    role: 'pharmacy' 
   });
   const navigate = useNavigate();
+
+  // 👇 DYNAMIC API URL (Works on both Vercel and Localhost)
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -19,10 +22,10 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Connects to your Node.js Backend
-      await axios.post('http://localhost:5000/api/auth/register', formData);
+      // Connects to the correct Backend
+      await axios.post(`${API_URL}/api/auth/register`, formData);
       alert('Registration Successful! Please Login.');
-      navigate('/'); // Redirect to Login
+      navigate('/'); 
     } catch (err) {
       console.error(err);
       alert(err.response?.data?.msg || 'Error registering');
@@ -62,6 +65,7 @@ export default function Register() {
             <select name="role" onChange={handleChange} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white">
               <option value="pharmacy">Pharmacy (Seller)</option>
               <option value="individual">Individual / Clinic (Buyer)</option>
+              <option value="admin">System Admin</option>
             </select>
           </div>
 

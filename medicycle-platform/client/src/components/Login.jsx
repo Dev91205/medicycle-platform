@@ -7,24 +7,26 @@ export default function Login() {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
 
+  // 👇 DYNAMIC API URL (Works on both Vercel and Localhost)
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(''); 
+    setError('');
     
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/login', formData);
+      const res = await axios.post(`${API_URL}/api/auth/login`, formData);
       
-      // 1. Save the Token and User Info
+      // 1. Save Token
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('userRole', res.data.user.role);
       localStorage.setItem('userName', res.data.user.username);
 
-      // 2. FORCE REFRESH to Dashboard
-      // This ensures App.jsx re-reads the token and renders the Sidebar
+      // 2. Force Refresh to load Sidebar
       window.location.href = '/dashboard';
       
     } catch (err) {
