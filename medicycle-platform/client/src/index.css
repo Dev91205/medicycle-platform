@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Apply your new theme globally */
+body {
+  background-color: #F8F9FA; /* Your 'background' color */
+  color: #212529;            /* Your 'textMain' color */
+  font-family: 'Poppins', sans-serif;
+}
