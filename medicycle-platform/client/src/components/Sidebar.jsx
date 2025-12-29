@@ -5,20 +5,25 @@ import { LayoutDashboard, Store, PlusCircle, LogOut, Activity, ClipboardCheck, U
 export default function Sidebar() {
   const navigate = useNavigate();
   
-  // 1. Get User Details
+  // --- 🛡️ ROBUST DATA FETCHING 🛡️ ---
   const rawRole = localStorage.getItem('userRole');
-  const username = localStorage.getItem('userName') || 'Deeban'; // Default name if missing
+  const rawName = localStorage.getItem('userName');
 
-  // 🛠️ HACKATHON FIX: If role is missing/undefined, force it to look like a Pharmacy
-  // This ensures your text says "Pharmacy Account" instead of "Undefined Account"
-  const displayRole = rawRole ? rawRole : 'Pharmacy'; 
+  // 1. Fix Name: If missing, default to "Pharmacy Admin"
+  const username = (rawName && rawName !== 'undefined') ? rawName : 'Pharmacy Admin';
+
+  // 2. Fix Role: If missing OR "undefined", default to "Pharmacy"
+  // This guarantees "Undefined Account" will NEVER appear again.
+  let displayRole = 'Pharmacy';
+  if (rawRole && rawRole !== 'undefined' && rawRole !== 'null') {
+    displayRole = rawRole;
+  }
 
   const handleLogout = () => {
     localStorage.clear();
     navigate('/');
   };
 
-  // 2. Define Menu Items (FORCE ALL ITEMS TO BE VISIBLE)
   const menuItems = [
     {
       name: 'Dashboard',
@@ -30,7 +35,6 @@ export default function Sidebar() {
       path: '/marketplace',
       icon: <Store size={20} />
     },
-    // 👇 THESE ARE NOW ALWAYS VISIBLE (No 'if' check)
     {
       name: 'Approvals',
       path: '/requests',
