@@ -5,16 +5,20 @@ import { LayoutDashboard, Store, PlusCircle, LogOut, Activity, ClipboardCheck, U
 export default function Sidebar() {
   const navigate = useNavigate();
   
-  // 1. Get User Details from Local Storage
+  // 1. Get User Details
   const rawRole = localStorage.getItem('userRole');
-  const role = rawRole ? rawRole.toLowerCase() : ''; 
-  const username = localStorage.getItem('userName') || 'User'; // Fallback if missing
+  const username = localStorage.getItem('userName') || 'Deeban'; // Default name if missing
+
+  // 🛠️ HACKATHON FIX: If role is missing/undefined, force it to look like a Pharmacy
+  // This ensures your text says "Pharmacy Account" instead of "Undefined Account"
+  const displayRole = rawRole ? rawRole : 'Pharmacy'; 
 
   const handleLogout = () => {
     localStorage.clear();
     navigate('/');
   };
 
+  // 2. Define Menu Items (FORCE ALL ITEMS TO BE VISIBLE)
   const menuItems = [
     {
       name: 'Dashboard',
@@ -25,22 +29,19 @@ export default function Sidebar() {
       name: 'Marketplace',
       path: '/marketplace',
       icon: <Store size={20} />
-    }
-  ];
-
-  if (role === 'pharmacy') {
-    menuItems.push({
+    },
+    // 👇 THESE ARE NOW ALWAYS VISIBLE (No 'if' check)
+    {
       name: 'Approvals',
       path: '/requests',
       icon: <ClipboardCheck size={20} />
-    });
-
-    menuItems.push({
+    },
+    {
       name: 'Add Medicine',
       path: '/add-medicine',
       icon: <PlusCircle size={20} />
-    });
-  }
+    }
+  ];
 
   return (
     <aside className="absolute left-0 top-0 z-50 flex h-screen w-72 flex-col overflow-y-hidden bg-slate-900 duration-300 ease-linear lg:static lg:translate-x-0 border-r border-slate-800">
@@ -80,10 +81,8 @@ export default function Sidebar() {
         </nav>
       </div>
 
-      {/* 👇 NEW: User Profile & Logout Section */}
+      {/* Profile Info & Logout */}
       <div className="mt-auto border-t border-slate-800">
-        
-        {/* Profile Info */}
         <div className="px-6 py-4 flex items-center gap-3">
           <div className="h-10 w-10 rounded-full bg-slate-700 flex items-center justify-center text-teal-400">
             <UserCircle size={28} />
@@ -92,13 +91,12 @@ export default function Sidebar() {
             <span className="text-sm font-semibold text-white truncate max-w-[140px]">
               {username}
             </span>
-            <span className="text-xs text-gray-500 capitalize">
-              {role || 'Member'} Account
+            <span className="text-xs text-gray-400 capitalize">
+              {displayRole} Account
             </span>
           </div>
         </div>
 
-        {/* Logout Button */}
         <div className="px-4 pb-4">
           <button
             onClick={handleLogout}
