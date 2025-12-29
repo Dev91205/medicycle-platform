@@ -39,21 +39,61 @@ const User = mongoose.model("User", UserSchema);
 // AUTH ROUTES
 // ===============================
 
-// ✅ ADDED: route hit log (CRITICAL)
+// ✅ route hit log
 app.use((req, res, next) => {
   console.log(`➡️ Incoming: ${req.method} ${req.url}`);
   next();
 });
 
-// 🔐 Google Login (Hackathon-safe)
+/* =====================================================
+   ✅ ADDED: STANDARD LOGIN ROUTE (THIS FIXES THE 404)
+===================================================== */
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ msg: "Email and password required" });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ msg: "Invalid Credentials" });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ msg: "Invalid Credentials" });
+    }
+
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    res.json({
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        role: user.role,
+      },
+    });
+  } catch (err) {
+    console.error("❌ Login Error:", err);
+    res.status(500).json({ msg: "Server Error" });
+  }
+});
+
+// 🔐 Google Login (already correct)
 app.post("/api/auth/google", async (req, res) => {
   try {
-    console.log("✅ /api/auth/google HIT"); // ✅ ADDED
+    console.log("✅ /api/auth/google HIT");
 
     const { username, email } = req.body;
 
     if (!email) {
-      console.log("❌ Email missing");
       return res.status(400).json({ msg: "Email required" });
     }
 
@@ -96,7 +136,7 @@ app.get("/", (req, res) => {
   res.send("🚀 MediCycle Backend Running");
 });
 
-// ✅ ADDED: final 404 catcher (DO NOT REMOVE)
+// 404 catcher
 app.use((req, res) => {
   console.log("❌ ROUTE NOT FOUND:", req.method, req.url);
   res.status(404).json({ msg: "Route not found" });
