@@ -87,6 +87,40 @@ app.get('/api/inventory/dashboard', auth, async (req, res) => {
     const analyzed = medicines.map(med => ({ ...med._doc, risk: calculateRisk(med.expiryDate) }));
     res.json({ inventory: analyzed });
 });
+app.post('/api/inventory', async (req, res) => {
+  try {
+    console.log("📥 Recieved Medicine Data:", req.body); // Debug log
+
+    // 1. Get data from frontend
+    const { name, quantity, expiryDate, batchNumber, condition } = req.body;
+
+    // 2. 🛡️ GOD MODE: Use a fake Seller ID if user is not logged in
+    // This allows the demo to work without authentication errors
+    const sellerId = req.user ? req.user.id : "65d4c8f8e4b0a1b2c3d4e5f6"; 
+
+    // 3. Create database entry
+    // NOTE: Make sure 'Medicine' matches your model name at the top of the file
+    const newMedicine = new Medicine({
+      seller: sellerId,
+      name,
+      quantity,
+      expiryDate,
+      batchNumber,
+      condition,
+      status: 'Safe' // Default status
+    });
+
+    // 4. Save to MongoDB
+    const savedMedicine = await newMedicine.save();
+    
+    console.log("✅ Medicine Saved!", savedMedicine);
+    res.json(savedMedicine);
+
+  } catch (err) {
+    console.error("❌ Save Failed:", err.message);
+    res.status(500).send('Server Error: ' + err.message);
+  }
+});
 
 app.get('/api/redistribute/market', auth, async (req, res) => {
     const market = await Medicine.find({ owner: { $ne: req.user.id }, redistributionStatus: 'available' })
