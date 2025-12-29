@@ -18,7 +18,7 @@ export default function Register() {
 
   // 🔴 IMPORTANT: REPLACE THIS WITH YOUR RENDER BACKEND URL
   // Example: 'https://medicycle-backend.onrender.com'
-  const API_URL = 'https://YOUR-RENDER-APP-NAME.onrender.com'; 
+  const API_URL = 'https://medicycle-platform.onrender.com'; 
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
