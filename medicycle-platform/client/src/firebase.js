@@ -1,11 +1,10 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
+// 👇 THIS LINE WAS MISSING. IT IS REQUIRED FOR LOGIN TO WORK.
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
 
 // Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyBcx8kGcm87Z1Kg1N0J67XOuKO100hMZSg",
   authDomain: "medicycle-auth.firebaseapp.com",
@@ -18,5 +17,10 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+
+// Initialize Analytics (Optional, only if you use it)
+const analytics = getAnalytics(app);
+
+// 👇 NOW THIS WILL WORK BECAUSE WE IMPORTED THEM AT THE TOP
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
