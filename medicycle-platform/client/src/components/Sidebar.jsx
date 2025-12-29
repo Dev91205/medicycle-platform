@@ -1,10 +1,14 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Store, PlusCircle, LogOut, Activity, ClipboardCheck } from 'lucide-react';
+import { LayoutDashboard, Store, PlusCircle, LogOut, Activity, ClipboardCheck, UserCircle } from 'lucide-react';
 
 export default function Sidebar() {
   const navigate = useNavigate();
-  const role = localStorage.getItem('userRole'); // 'pharmacy' or 'individual'
+  
+  // 1. Get User Details from Local Storage
+  const rawRole = localStorage.getItem('userRole');
+  const role = rawRole ? rawRole.toLowerCase() : ''; 
+  const username = localStorage.getItem('userName') || 'User'; // Fallback if missing
 
   const handleLogout = () => {
     localStorage.clear();
@@ -24,11 +28,10 @@ export default function Sidebar() {
     }
   ];
 
-  // 👇 ADDED BACK: Only Pharmacies need to see "Approvals" (Requests) and "Add Medicine"
   if (role === 'pharmacy') {
     menuItems.push({
-      name: 'Approvals', // Restored Feature
-      path: '/requests', // Check if this matches your Route path
+      name: 'Approvals',
+      path: '/requests',
       icon: <ClipboardCheck size={20} />
     });
 
@@ -40,7 +43,6 @@ export default function Sidebar() {
   }
 
   return (
-    // 👇 REVERTED TO DARK THEME (bg-slate-900)
     <aside className="absolute left-0 top-0 z-50 flex h-screen w-72 flex-col overflow-y-hidden bg-slate-900 duration-300 ease-linear lg:static lg:translate-x-0 border-r border-slate-800">
       
       {/* Logo Section */}
@@ -64,8 +66,8 @@ export default function Sidebar() {
                   className={({ isActive }) =>
                     `group relative flex items-center gap-2.5 rounded-lg px-4 py-3 font-medium duration-300 ease-in-out ${
                       isActive
-                        ? 'bg-slate-800 text-teal-400 border-r-4 border-teal-400' // Active: Darker bg + Teal Text
-                        : 'text-gray-400 hover:bg-slate-800 hover:text-white'     // Inactive: Gray Text
+                        ? 'bg-slate-800 text-teal-400 border-r-4 border-teal-400' 
+                        : 'text-gray-400 hover:bg-slate-800 hover:text-white'
                     }`
                   }
                 >
@@ -78,16 +80,36 @@ export default function Sidebar() {
         </nav>
       </div>
 
-      {/* Logout Button */}
-      <div className="mt-auto p-6 border-t border-slate-800">
-        <button
-          onClick={handleLogout}
-          className="flex w-full items-center gap-2.5 rounded-lg px-4 py-3 text-red-400 hover:bg-slate-800 hover:text-red-300 transition font-medium"
-        >
-          <LogOut size={20} />
-          Logout
-        </button>
+      {/* 👇 NEW: User Profile & Logout Section */}
+      <div className="mt-auto border-t border-slate-800">
+        
+        {/* Profile Info */}
+        <div className="px-6 py-4 flex items-center gap-3">
+          <div className="h-10 w-10 rounded-full bg-slate-700 flex items-center justify-center text-teal-400">
+            <UserCircle size={28} />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold text-white truncate max-w-[140px]">
+              {username}
+            </span>
+            <span className="text-xs text-gray-500 capitalize">
+              {role || 'Member'} Account
+            </span>
+          </div>
+        </div>
+
+        {/* Logout Button */}
+        <div className="px-4 pb-4">
+          <button
+            onClick={handleLogout}
+            className="flex w-full items-center justify-center gap-2.5 rounded-lg bg-slate-800 px-4 py-3 text-red-400 hover:bg-red-500/10 hover:text-red-300 transition font-medium border border-slate-700"
+          >
+            <LogOut size={18} />
+            Sign Out
+          </button>
+        </div>
       </div>
+
     </aside>
   );
 }
