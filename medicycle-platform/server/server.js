@@ -8,7 +8,9 @@ const jwt = require("jsonwebtoken");
 const app = express();
 app.use(express.json());
 
-// 🔒 CORS – allow Vercel frontend
+// ===============================
+// CORS
+// ===============================
 app.use(
   cors({
     origin: "https://medicycle-platform.vercel.app",
@@ -27,6 +29,8 @@ mongoose
 // ===============================
 // MODELS
 // ===============================
+
+// USER
 const UserSchema = new mongoose.Schema({
   username: String,
   email: { type: String, unique: true },
@@ -35,19 +39,35 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model("User", UserSchema);
 
+// MEDICINE
+const MedicineSchema = new mongoose.Schema({
+  owner: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
+  name: { type: String, required: true },
+  quantity: { type: Number, required: true },
+  expiryDate: { type: Date, required: true },
+  batchNumber: String,
+  condition: String,
+  status: { type: String, default: "active" },
+  createdAt: { type: Date, default: Date.now },
+});
+const Medicine = mongoose.model("Medicine", MedicineSchema);
+
+// ===============================
+// REQUEST LOGGER (DEBUG)
+// ===============================
+app.use((req, res, next) => {
+  console.log(`➡️ ${req.method} ${req.url}`);
+  next();
+});
+
 // ===============================
 // AUTH ROUTES
 // ===============================
 
-// ✅ route hit log
-app.use((req, res, next) => {
-  console.log(`➡️ Incoming: ${req.method} ${req.url}`);
-  next();
-});
-
-/* =====================================================
-   ✅ REGISTER ROUTE (ADDED – FIXES REGISTER 404)
-===================================================== */
+// REGISTER
 app.post("/api/auth/register", async (req, res) => {
   try {
     const { username, email, password, role } = req.body;
@@ -63,25 +83,21 @@ app.post("/api/auth/register", async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await User.create({
+    await User.create({
       username,
       email,
       password: hashedPassword,
       role: role || "pharmacy",
     });
 
-    res.status(201).json({
-      msg: "User registered successfully",
-    });
+    res.status(201).json({ msg: "User registered successfully" });
   } catch (err) {
     console.error("❌ Register Error:", err);
     res.status(500).json({ msg: "Server Error" });
   }
 });
 
-/* =====================================================
-   ✅ STANDARD LOGIN ROUTE
-===================================================== */
+// LOGIN
 app.post("/api/auth/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -120,13 +136,9 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
-/* =====================================================
-   ✅ GOOGLE LOGIN
-===================================================== */
+// GOOGLE LOGIN
 app.post("/api/auth/google", async (req, res) => {
   try {
-    console.log("✅ /api/auth/google HIT");
-
     const { username, email } = req.body;
 
     if (!email) {
@@ -138,7 +150,7 @@ app.post("/api/auth/google", async (req, res) => {
     if (!user) {
       const hashed = await bcrypt.hash("google-auth", 10);
       user = await User.create({
-        username,
+        username: username || "Google User",
         email,
         password: hashed,
         role: "individual",
@@ -166,6 +178,46 @@ app.post("/api/auth/google", async (req, res) => {
 });
 
 // ===============================
+// INVENTORY ROUTES
+// ===============================
+
+// ADD MEDICINE
+app.post("/api/inventory", async (req, res) => {
+  try {
+    const { name, quantity, expiryDate, batchNumber, condition } = req.body;
+
+    if (!name || !quantity || !expiryDate) {
+      return res.status(400).json({ msg: "Required fields missing" });
+    }
+
+    const medicine = await Medicine.create({
+      name,
+      quantity,
+      expiryDate,
+      batchNumber,
+      condition,
+      status: "active",
+    });
+
+    res.status(201).json(medicine);
+  } catch (err) {
+    console.error("❌ Add Medicine Error:", err);
+    res.status(500).json({ msg: "Server Error" });
+  }
+});
+
+// GET ALL MEDICINES
+app.get("/api/inventory", async (req, res) => {
+  try {
+    const medicines = await Medicine.find().sort({ createdAt: -1 });
+    res.json(medicines);
+  } catch (err) {
+    console.error("❌ Fetch Inventory Error:", err);
+    res.status(500).json({ msg: "Server Error" });
+  }
+});
+
+// ===============================
 // HEALTH CHECK
 // ===============================
 app.get("/", (req, res) => {
@@ -173,7 +225,7 @@ app.get("/", (req, res) => {
 });
 
 // ===============================
-// 404 CATCHER
+// 404 HANDLER
 // ===============================
 app.use((req, res) => {
   console.log("❌ ROUTE NOT FOUND:", req.method, req.url);
@@ -184,6 +236,6 @@ app.use((req, res) => {
 // SERVER START
 // ===============================
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () =>
-  console.log(`🚀 Backend running on port ${PORT}`)
-);
+app.listen(PORT, () => {
+  console.log(`🚀 Backend running on port ${PORT}`);
+});
