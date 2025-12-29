@@ -46,7 +46,41 @@ app.use((req, res, next) => {
 });
 
 /* =====================================================
-   ✅ ADDED: STANDARD LOGIN ROUTE (THIS FIXES THE 404)
+   ✅ REGISTER ROUTE (ADDED – FIXES REGISTER 404)
+===================================================== */
+app.post("/api/auth/register", async (req, res) => {
+  try {
+    const { username, email, password, role } = req.body;
+
+    if (!username || !email || !password) {
+      return res.status(400).json({ msg: "All fields are required" });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ msg: "User already exists" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await User.create({
+      username,
+      email,
+      password: hashedPassword,
+      role: role || "pharmacy",
+    });
+
+    res.status(201).json({
+      msg: "User registered successfully",
+    });
+  } catch (err) {
+    console.error("❌ Register Error:", err);
+    res.status(500).json({ msg: "Server Error" });
+  }
+});
+
+/* =====================================================
+   ✅ STANDARD LOGIN ROUTE
 ===================================================== */
 app.post("/api/auth/login", async (req, res) => {
   try {
@@ -86,7 +120,9 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
-// 🔐 Google Login (already correct)
+/* =====================================================
+   ✅ GOOGLE LOGIN
+===================================================== */
 app.post("/api/auth/google", async (req, res) => {
   try {
     console.log("✅ /api/auth/google HIT");
@@ -136,12 +172,17 @@ app.get("/", (req, res) => {
   res.send("🚀 MediCycle Backend Running");
 });
 
-// 404 catcher
+// ===============================
+// 404 CATCHER
+// ===============================
 app.use((req, res) => {
   console.log("❌ ROUTE NOT FOUND:", req.method, req.url);
   res.status(404).json({ msg: "Route not found" });
 });
 
+// ===============================
+// SERVER START
+// ===============================
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () =>
   console.log(`🚀 Backend running on port ${PORT}`)
