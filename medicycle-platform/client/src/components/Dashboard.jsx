@@ -1,117 +1,162 @@
-import React, { useState } from 'react';
-import { AlertTriangle, ShieldCheck, Activity, TrendingUp } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { LayoutDashboard, AlertTriangle, CheckCircle, Package, Calendar, TrendingUp } from 'lucide-react';
 
 export default function Dashboard() {
-  const stats = { critical: 2, warning: 5, safe: 120 };
-  
-  const inventory = [
-    { _id: 1, name: 'Amoxicillin 500mg', batch: 'B-101', expiry: '2025-01-20', risk: 'CRITICAL' },
-    { _id: 2, name: 'Paracetamol', batch: 'P-200', expiry: '2025-04-10', risk: 'SAFE' },
-    { _id: 3, name: 'Metformin', batch: 'M-505', expiry: '2025-03-15', risk: 'WARNING' },
-    { _id: 4, name: 'Insulin', batch: 'I-99', expiry: '2025-01-10', risk: 'CRITICAL' },
+  const [inventory, setInventory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [usingDummyData, setUsingDummyData] = useState(false);
+
+  // 👇 DUMMY DATA FOR DASHBOARD (Shows if DB is empty)
+  const dummyInventory = [
+    { _id: 'd1', name: 'Amoxicillin 500mg', quantity: 120, expiryDate: '2024-02-10', batchNumber: 'B-101', status: 'active', risk: { level: 'CRITICAL', color: 'red' } },
+    { _id: 'd2', name: 'Paracetamol 650mg', quantity: 500, expiryDate: '2025-08-15', batchNumber: 'P-202', status: 'active', risk: { level: 'SAFE', color: 'green' } },
+    { _id: 'd3', name: 'Metformin 500mg', quantity: 300, expiryDate: '2024-05-20', batchNumber: 'M-305', status: 'active', risk: { level: 'WARNING', color: 'orange' } },
+    { _id: 'd4', name: 'Cetirizine 10mg', quantity: 200, expiryDate: '2026-01-01', batchNumber: 'C-999', status: 'active', risk: { level: 'SAFE', color: 'green' } }
   ];
 
-  const getRiskStyle = (risk) => {
-    if (risk === 'CRITICAL') return 'bg-red-50 text-red-700 border border-red-200';
-    if (risk === 'WARNING') return 'bg-orange-50 text-orange-700 border border-orange-200';
-    return 'bg-green-50 text-green-700 border border-green-200';
+  // Helper: Calculate Risk (Same as server logic)
+  const calculateRisk = (date) => {
+    const today = new Date();
+    const exp = new Date(date);
+    const diffTime = exp - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) return { level: 'EXPIRED', color: 'red' };
+    if (diffDays <= 30) return { level: 'CRITICAL', color: 'red' };
+    if (diffDays <= 90) return { level: 'WARNING', color: 'orange' };
+    return { level: 'SAFE', color: 'green' };
   };
 
-  return (
-    <div className="max-w-7xl mx-auto">
+  useEffect(() => {
+    fetchInventory();
+  }, []);
+
+  const fetchInventory = async () => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const token = localStorage.getItem('token');
+      const config = { headers: { 'x-auth-token': token } };
+
+      const res = await axios.get(`${API_URL}/api/inventory`, config);
       
-      {/* Header Section */}
-      <div className="mb-8 text-white">
-        <h1 className="text-3xl font-bold">Good Morning, Pharmacy A</h1>
-        <p className="text-teal-100 mt-1 opacity-90">Here is your inventory health overview for today.</p>
+      if (res.data && res.data.length > 0) {
+        setInventory(res.data);
+        setUsingDummyData(false);
+      } else {
+        setInventory(dummyInventory);
+        setUsingDummyData(true);
+      }
+
+    } catch (err) {
+      console.error("Using Dummy Dashboard Data");
+      setInventory(dummyInventory);
+      setUsingDummyData(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) return <div className="p-8 text-center text-teal-600 animate-pulse">Loading Dashboard...</div>;
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-gray-800">Inventory Health</h2>
+        {usingDummyData && (
+          <span className="text-xs bg-orange-100 text-orange-600 px-3 py-1 rounded-full font-bold">
+            Demo Mode
+          </span>
+        )}
       </div>
 
-      {/* Stats Grid - Floating Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 relative z-10">
-        
-        {/* Critical Card */}
-        <div className="bg-white p-6 rounded-2xl shadow-lg border-l-8 border-danger hover:transform hover:-translate-y-1 transition-all duration-300">
-            <div className="flex justify-between items-start">
-                <div>
-                    <p className="text-gray-500 text-sm font-semibold uppercase tracking-wider">Critical Action</p>
-                    <h3 className="text-4xl font-bold text-gray-800 mt-2">{stats.critical}</h3>
-                </div>
-                <div className="bg-red-100 p-3 rounded-full text-danger">
-                    <AlertTriangle size={24} />
-                </div>
-            </div>
-            <p className="text-sm text-red-600 mt-4 font-medium">Expires in &lt; 30 days</p>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-red-50 p-6 rounded-2xl border border-red-100">
+          <div className="flex items-center gap-3 mb-2">
+            <AlertTriangle className="text-red-500" />
+            <h3 className="text-red-800 font-bold">Critical Action</h3>
+          </div>
+          <p className="text-3xl font-bold text-gray-800">
+            {inventory.filter(i => calculateRisk(i.expiryDate).level === 'CRITICAL').length}
+          </p>
+          <p className="text-sm text-red-600 mt-1">Items expiring soon</p>
         </div>
 
-        {/* Warning Card */}
-        <div className="bg-white p-6 rounded-2xl shadow-lg border-l-8 border-warning hover:transform hover:-translate-y-1 transition-all duration-300">
-            <div className="flex justify-between items-start">
-                <div>
-                    <p className="text-gray-500 text-sm font-semibold uppercase tracking-wider">Warning Zone</p>
-                    <h3 className="text-4xl font-bold text-gray-800 mt-2">{stats.warning}</h3>
-                </div>
-                <div className="bg-orange-100 p-3 rounded-full text-warning">
-                    <Activity size={24} />
-                </div>
-            </div>
-            <p className="text-sm text-orange-600 mt-4 font-medium">Expires in 30-60 days</p>
+        <div className="bg-orange-50 p-6 rounded-2xl border border-orange-100">
+          <div className="flex items-center gap-3 mb-2">
+            <TrendingUp className="text-orange-500" />
+            <h3 className="text-orange-800 font-bold">Warning Zone</h3>
+          </div>
+          <p className="text-3xl font-bold text-gray-800">
+            {inventory.filter(i => calculateRisk(i.expiryDate).level === 'WARNING').length}
+          </p>
+          <p className="text-sm text-orange-600 mt-1">Expiring in 3 months</p>
         </div>
 
-        {/* Safe Card */}
-        <div className="bg-white p-6 rounded-2xl shadow-lg border-l-8 border-success hover:transform hover:-translate-y-1 transition-all duration-300">
-            <div className="flex justify-between items-start">
-                <div>
-                    <p className="text-gray-500 text-sm font-semibold uppercase tracking-wider">Safe Stock</p>
-                    <h3 className="text-4xl font-bold text-gray-800 mt-2">{stats.safe}</h3>
-                </div>
-                <div className="bg-green-100 p-3 rounded-full text-success">
-                    <ShieldCheck size={24} />
-                </div>
-            </div>
-            <p className="text-sm text-green-600 mt-4 font-medium">No immediate action</p>
+        <div className="bg-teal-50 p-6 rounded-2xl border border-teal-100">
+          <div className="flex items-center gap-3 mb-2">
+            <CheckCircle className="text-teal-600" />
+            <h3 className="text-teal-800 font-bold">Safe Stock</h3>
+          </div>
+          <p className="text-3xl font-bold text-gray-800">
+            {inventory.filter(i => calculateRisk(i.expiryDate).level === 'SAFE').length}
+          </p>
+          <p className="text-sm text-teal-600 mt-1">Healthy inventory</p>
         </div>
       </div>
 
-      {/* Main Table - Floating Card */}
-      <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                <TrendingUp size={20} className="text-primary"/>
-                Batch Intelligence
-            </h2>
-            <button className="text-sm text-primary font-semibold hover:underline">Download Report</button>
+      {/* Inventory Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100">
+          <h3 className="font-bold text-gray-800">Batch Intelligence</h3>
         </div>
-        
-        <table className="w-full text-left">
-            <thead className="bg-gray-50">
-                <tr>
-                    <th className="p-5 text-gray-500 font-semibold text-sm">Medicine Name</th>
-                    <th className="p-5 text-gray-500 font-semibold text-sm">Batch #</th>
-                    <th className="p-5 text-gray-500 font-semibold text-sm">Expiry Date</th>
-                    <th className="p-5 text-gray-500 font-semibold text-sm">Status</th>
-                    <th className="p-5 text-gray-500 font-semibold text-sm text-right">Action</th>
-                </tr>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 text-left">
+              <tr>
+                <th className="px-6 py-4 text-sm font-semibold text-gray-500">Medicine Name</th>
+                <th className="px-6 py-4 text-sm font-semibold text-gray-500">Batch #</th>
+                <th className="px-6 py-4 text-sm font-semibold text-gray-500">Expiry Date</th>
+                <th className="px-6 py-4 text-sm font-semibold text-gray-500">Status</th>
+                <th className="px-6 py-4 text-sm font-semibold text-gray-500">Action</th>
+              </tr>
             </thead>
-            <tbody>
-                {inventory.map((item, index) => (
-                    <tr key={item._id} className={`border-b border-gray-50 hover:bg-slate-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
-                        <td className="p-5 font-medium text-gray-800">{item.name}</td>
-                        <td className="p-5 text-gray-500 font-mono text-sm">{item.batch}</td>
-                        <td className="p-5 text-gray-600">{new Date(item.expiry).toLocaleDateString()}</td>
-                        <td className="p-5">
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${getRiskStyle(item.risk)}`}>
-                                {item.risk}
-                            </span>
-                        </td>
-                        <td className="p-5 text-right">
-                           {item.risk === 'CRITICAL' && (
-                               <button className="text-blue-600 hover:text-blue-800 text-sm font-semibold">Redistribute</button>
-                           )}
-                        </td>
-                    </tr>
-                ))}
+            <tbody className="divide-y divide-gray-100">
+              {inventory.map((item) => {
+                const risk = item.risk || calculateRisk(item.expiryDate);
+                return (
+                  <tr key={item._id} className="hover:bg-gray-50 transition">
+                    <td className="px-6 py-4 font-medium text-gray-800">{item.name}</td>
+                    <td className="px-6 py-4 text-gray-500">{item.batchNumber}</td>
+                    <td className="px-6 py-4 text-gray-600">
+                      <div className="flex items-center gap-2">
+                        <Calendar size={14} className="text-gray-400" />
+                        {new Date(item.expiryDate).toLocaleDateString()}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold 
+                        ${risk.level === 'CRITICAL' ? 'bg-red-100 text-red-600' : 
+                          risk.level === 'WARNING' ? 'bg-orange-100 text-orange-600' : 
+                          'bg-green-100 text-green-600'}`}>
+                        {risk.level}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {risk.level === 'CRITICAL' && (
+                        <button className="text-blue-600 hover:text-blue-700 text-sm font-semibold">
+                          Redistribute
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
-        </table>
+          </table>
+        </div>
       </div>
     </div>
   );
