@@ -6,9 +6,9 @@ import Login from './components/Login';
 import Register from './components/Register';
 import Dashboard from './components/Dashboard';
 import Sidebar from './components/Sidebar';
-import Marketplace from './components/Marketplace';
+import Marketplace from './components/Marketplace'; // Ensure you have this file
 import AddMedicine from './components/AddMedicine';
-import Requests from './components/Requests'; // 👈 THIS WAS LIKELY MISSING
+import Requests from './components/Requests'; // ✅ Approvals Page
 
 // Helper: Redirects logged-in users away from Login/Register
 const PublicRoute = ({ children }) => {
@@ -71,7 +71,7 @@ function AppContent() {
                 </PrivateRoute>
               } />
 
-              {/* 👇 THE MISSING APPROVALS ROUTE 👇 */}
+              {/* ✅ THE APPROVALS ROUTE */}
               <Route path="/requests" element={
                 <PrivateRoute>
                   <Requests />
