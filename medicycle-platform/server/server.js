@@ -2,173 +2,233 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
-// Helper for Expiry Logic
-const calculateRisk = (expiryDate) => {
-  const today = new Date();
-  const exp = new Date(expiryDate);
-  const diffTime = exp - today;
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  if (diffDays < 0) return { level: 'EXPIRED', color: 'red', daysRemaining: diffDays };
-  if (diffDays <= 30) return { level: 'CRITICAL', color: 'darkred', daysRemaining: diffDays };
-  if (diffDays <= 60) return { level: 'WARNING', color: 'orange', daysRemaining: diffDays };
-  return { level: 'SAFE', color: 'green', daysRemaining: diffDays };
-};
+// Initialize App
+const app = express();
+app.use(express.json());
+app.use(cors());
 
-// Models
+// ==========================================
+// 1️⃣ DATABASE CONNECTION
+// ==========================================
+// Use your local URI or this fallback for testing
+const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://admin:admin123@cluster0.mongodb.net/medicycle?retryWrites=true&w=majority";
+
+mongoose.connect(MONGO_URI)
+  .then(() => console.log('✅ MongoDB Connected'))
+  .catch(err => console.log('❌ DB Error:', err));
+
+// ==========================================
+// 2️⃣ MODELS
+// ==========================================
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true },
   email: { type: String, unique: true, required: true },
   password: { type: String, required: true },
-  role: { type: String, enum: ['individual', 'pharmacy', 'admin'], default: 'individual' },
-  location: { type: String, default: 'Local Area' }
+  role: { type: String, default: 'pharmacy' } 
 });
 const User = mongoose.model('User', userSchema);
 
 const medicineSchema = new mongoose.Schema({
   owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   name: { type: String, required: true },
-  batchNumber: { type: String, required: true },
-  expiryDate: { type: Date, required: true },
   quantity: { type: Number, required: true },
-  status: { type: String, enum: ['active', 'sold', 'expired'], default: 'active' },
-  redistributionStatus: { type: String, enum: ['none', 'available', 'requested', 'transferred'], default: 'none' }
+  expiryDate: { type: Date, required: true },
+  batchNumber: { type: String },
+  condition: { type: String },
+  status: { type: String, default: 'active' }, // active, sold, expired
+  date: { type: Date, default: Date.now }
 });
 const Medicine = mongoose.model('Medicine', medicineSchema);
 
-const redistributionSchema = new mongoose.Schema({
-  medicineId: { type: mongoose.Schema.Types.ObjectId, ref: 'Medicine' },
-  fromUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  toUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  status: { type: String, enum: ['pending', 'accepted', 'rejected'], default: 'pending' },
+const transactionSchema = new mongoose.Schema({
+  medicine: { type: mongoose.Schema.Types.ObjectId, ref: 'Medicine' },
+  seller: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  buyer: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  status: { type: String, default: 'pending' }, // pending, approved, rejected
+  quantity: { type: Number, default: 1 },
   requestDate: { type: Date, default: Date.now }
 });
-const Redistribution = mongoose.model('Redistribution', redistributionSchema);
+const Transaction = mongoose.model('Transaction', transactionSchema);
 
-const app = express();
-app.use(express.json());
-app.use(cors());
-
-// Middleware
-const auth = (req, res, next) => {
-    const token = req.header('x-auth-token');
-    if (!token) return res.status(401).json({ msg: 'No token' });
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = decoded;
-        next();
-    } catch (e) { res.status(400).json({ msg: 'Invalid Token' }); }
+// ==========================================
+// 3️⃣ HELPER: Risk Calculator
+// ==========================================
+const calculateRisk = (expiryDate) => {
+  const today = new Date();
+  const exp = new Date(expiryDate);
+  const diffTime = exp - today;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays < 0) return { level: 'EXPIRED', color: 'red', daysRemaining: diffDays };
+  if (diffDays <= 30) return { level: 'CRITICAL', color: 'darkred', daysRemaining: diffDays };
+  if (diffDays <= 60) return { level: 'WARNING', color: 'orange', daysRemaining: diffDays };
+  return { level: 'SAFE', color: 'green', daysRemaining: diffDays };
 };
 
-// Routes
+// ==========================================
+// 4️⃣ AUTH ROUTES (Login/Register)
+// ==========================================
 app.post('/api/auth/register', async (req, res) => {
+  try {
     const { username, email, password, role } = req.body;
+    // Check if user exists
+    let user = await User.findOne({ email });
+    if (user) return res.status(400).json({ msg: 'User already exists' });
+
+    // Hash Password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-    const user = new User({ username, email, password: hashedPassword, role });
+
+    // Create User
+    user = new User({ username, email, password: hashedPassword, role });
     await user.save();
-    res.json({ msg: "User registered" });
+
+    res.json({ msg: 'User registered successfully' });
+  } catch (err) {
+    res.status(500).send('Server Error');
+  }
 });
 
 app.post('/api/auth/login', async (req, res) => {
+  try {
     const { email, password } = req.body;
+    // Check User
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ msg: "User not found" });
+    if (!user) return res.status(400).json({ msg: 'Invalid Credentials' });
+
+    // Check Password
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ msg: "Invalid credentials" });
-    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET);
-    res.json({ token, user: { id: user._id, username: user.username } });
+    if (!isMatch) return res.status(400).json({ msg: 'Invalid Credentials' });
+
+    // Create Token
+    const token = jwt.sign(
+      { id: user._id, role: user.role }, 
+      process.env.JWT_SECRET || 'secret123', 
+      { expiresIn: '1h' }
+    );
+
+    res.json({ 
+      token, 
+      user: { 
+        id: user._id, 
+        username: user.username, 
+        role: user.role 
+      } 
+    });
+  } catch (err) {
+    res.status(500).send('Server Error');
+  }
 });
 
-app.get('/api/inventory/dashboard', auth, async (req, res) => {
-    const medicines = await Medicine.find({ owner: req.user.id, status: 'active' });
-    const analyzed = medicines.map(med => ({ ...med._doc, risk: calculateRisk(med.expiryDate) }));
-    res.json({ inventory: analyzed });
+// ==========================================
+// 5️⃣ GOD MODE INVENTORY ROUTES
+// ==========================================
+
+// GET: Return ALL medicines (Universal View)
+app.get('/api/inventory', async (req, res) => {
+  try {
+    // Fetch all medicines, newest first
+    const medicines = await Medicine.find().sort({ date: -1 });
+    
+    // Add the risk analysis
+    const analyzed = medicines.map(med => ({ 
+      ...med._doc, 
+      risk: calculateRisk(med.expiryDate) 
+    }));
+    
+    // Return ARRAY directly (matches your frontend logic)
+    res.json(analyzed);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
 });
+
+// POST: Add Medicine (Universal Add)
 app.post('/api/inventory', async (req, res) => {
   try {
-    console.log("📥 Recieved Medicine Data:", req.body); // Debug log
-
-    // 1. Get data from frontend
     const { name, quantity, expiryDate, batchNumber, condition } = req.body;
 
-    // 2. 🛡️ GOD MODE: Use a fake Seller ID if user is not logged in
-    // This allows the demo to work without authentication errors
-    const sellerId = req.user ? req.user.id : "65d4c8f8e4b0a1b2c3d4e5f6"; 
+    // 🛠️ HACK: Use a "Demo ID" if user is not logged in
+    // This creates a fake "Pharmacy Owner" so the app doesn't crash
+    const demoOwnerId = "65d4c8f8e4b0a1b2c3d4e5f6"; 
+    
+    // Try to get ID from token if it exists, otherwise use Demo ID
+    let ownerId = demoOwnerId;
+    const token = req.header('x-auth-token');
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret123');
+        ownerId = decoded.id;
+      } catch (e) { /* Token invalid? Ignore and use demo ID */ }
+    }
 
-    // 3. Create database entry
-    // NOTE: Make sure 'Medicine' matches your model name at the top of the file
     const newMedicine = new Medicine({
-      seller: sellerId,
+      owner: ownerId,
       name,
       quantity,
       expiryDate,
       batchNumber,
       condition,
-      status: 'Safe' // Default status
+      status: 'active'
     });
 
-    // 4. Save to MongoDB
-    const savedMedicine = await newMedicine.save();
-    
-    console.log("✅ Medicine Saved!", savedMedicine);
-    res.json(savedMedicine);
+    const medicine = await newMedicine.save();
+    console.log("✅ Medicine Added:", medicine);
+    res.json(medicine);
 
   } catch (err) {
-    console.error("❌ Save Failed:", err.message);
-    res.status(500).send('Server Error: ' + err.message);
+    console.error("❌ Add Failed:", err.message);
+    res.status(500).send('Server Error');
   }
 });
 
-app.get('/api/redistribute/market', auth, async (req, res) => {
-    const market = await Medicine.find({ owner: { $ne: req.user.id }, redistributionStatus: 'available' })
-        .populate('owner', 'username location');
-    const analyzed = market.map(m => ({ ...m._doc, risk: calculateRisk(m.expiryDate) }));
-    res.json(analyzed);
-});
+// ==========================================
+// 6️⃣ APPROVALS / TRANSACTIONS ROUTES
+// ==========================================
 
-app.post('/api/redistribute/request', auth, async (req, res) => {
-    const { medicineId } = req.body;
-    const medicine = await Medicine.findById(medicineId);
-    if (!medicine || medicine.redistributionStatus !== 'available') return res.status(400).json({ msg: 'Unavailable' });
-    
-    const request = new Redistribution({
-        medicineId, fromUser: medicine.owner, toUser: req.user.id, status: 'pending'
-    });
-    await request.save();
-    
-    medicine.redistributionStatus = 'requested';
-    await medicine.save();
-    res.json({ msg: 'Request Sent' });
-});
-
-app.get('/api/redistribute/pending', auth, async (req, res) => {
-    const requests = await Redistribution.find({ fromUser: req.user.id, status: 'pending' })
-        .populate('medicineId').populate('toUser', 'username');
+// GET Pending Requests
+app.get('/api/transactions/pending', async (req, res) => {
+  try {
+    // For Demo: Return ALL pending transactions
+    const requests = await Transaction.find({ status: 'pending' })
+      .populate('medicine')
+      .populate('buyer', 'username')
+      .populate('seller', 'username');
+      
     res.json(requests);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Server Error');
+  }
 });
 
-app.put('/api/redistribute/respond', auth, async (req, res) => {
-    const { requestId, action } = req.body;
-    const request = await Redistribution.findById(requestId);
-    const medicine = await Medicine.findById(request.medicineId);
+// PUT (Approve/Reject) Request
+app.put('/api/transactions/:id', async (req, res) => {
+  try {
+    const { status } = req.body; // 'approved' or 'rejected'
+    
+    // Update Transaction
+    const transaction = await Transaction.findByIdAndUpdate(
+      req.params.id, 
+      { status }, 
+      { new: true }
+    );
 
-    if (action === 'accept') {
-        request.status = 'accepted';
-        medicine.owner = request.toUser;
-        medicine.redistributionStatus = 'none';
-    } else {
-        request.status = 'rejected';
-        medicine.redistributionStatus = 'available';
+    // If approved, update the Medicine status too
+    if (status === 'approved' && transaction.medicine) {
+        await Medicine.findByIdAndUpdate(transaction.medicine, { status: 'sold' });
     }
-    await medicine.save();
-    await request.save();
-    res.json({ msg: 'Processed' });
+
+    res.json(transaction);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Server Error');
+  }
 });
 
 const PORT = process.env.PORT || 5000;
-mongoose.connect(process.env.MONGO_URI)
-    .then(() => app.listen(PORT, () => console.log('Server running')))
-    .catch(err => console.log(err));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
