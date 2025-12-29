@@ -14,26 +14,34 @@ export default function Login() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
+  // In client/src/components/Login.jsx
+
+const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     
     try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       const res = await axios.post(`${API_URL}/api/auth/login`, formData);
       
-      // 1. Save Token
+      // 👇 THIS IS THE CRITICAL PART
+      // We must save the role exactly as the backend sends it
       localStorage.setItem('token', res.data.token);
-      localStorage.setItem('userRole', res.data.user.role);
-      localStorage.setItem('userName', res.data.user.username);
+      
+      // Fix: Ensure we save a fallback if the backend sends nothing
+      const roleToSave = res.data.user.role || 'pharmacy'; 
+      localStorage.setItem('userRole', roleToSave);
+      
+      const nameToSave = res.data.user.username || 'User';
+      localStorage.setItem('userName', nameToSave);
 
-      // 2. Force Refresh to load Sidebar
       window.location.href = '/dashboard';
       
     } catch (err) {
       console.error(err);
       setError(err.response?.data?.msg || 'Invalid Credentials');
     }
-  };
+};
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
