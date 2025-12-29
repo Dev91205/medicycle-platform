@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Store, PlusCircle, LogOut, Activity } from 'lucide-react';
+import { LayoutDashboard, Store, PlusCircle, LogOut, Activity, ClipboardCheck } from 'lucide-react';
 
 export default function Sidebar() {
   const navigate = useNavigate();
@@ -24,8 +24,14 @@ export default function Sidebar() {
     }
   ];
 
-  // Only show "Add Medicine" if the user is a Pharmacy (Seller)
+  // 👇 ADDED BACK: Only Pharmacies need to see "Approvals" (Requests) and "Add Medicine"
   if (role === 'pharmacy') {
+    menuItems.push({
+      name: 'Approvals', // Restored Feature
+      path: '/requests', // Check if this matches your Route path
+      icon: <ClipboardCheck size={20} />
+    });
+
     menuItems.push({
       name: 'Add Medicine',
       path: '/add-medicine',
@@ -34,15 +40,16 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="absolute left-0 top-0 z-50 flex h-screen w-72 flex-col overflow-y-hidden bg-white duration-300 ease-linear lg:static lg:translate-x-0 border-r border-gray-200">
+    // 👇 REVERTED TO DARK THEME (bg-slate-900)
+    <aside className="absolute left-0 top-0 z-50 flex h-screen w-72 flex-col overflow-y-hidden bg-slate-900 duration-300 ease-linear lg:static lg:translate-x-0 border-r border-slate-800">
       
       {/* Logo Section */}
-      <div className="flex items-center justify-center gap-2 px-6 py-5.5 lg:py-6.5 border-b border-gray-100">
-        <div className="bg-teal-50 p-2 rounded-full">
-           <Activity className="text-primary" size={28} />
+      <div className="flex items-center justify-center gap-2 px-6 py-5.5 lg:py-6.5 border-b border-slate-800">
+        <div className="bg-teal-900/30 p-2 rounded-full">
+           <Activity className="text-teal-400" size={28} />
         </div>
-        <h1 className="text-2xl font-bold text-gray-800">
-          Medi<span className="text-primary">Cycle</span>
+        <h1 className="text-2xl font-bold text-white">
+          Medi<span className="text-teal-400">Cycle</span>
         </h1>
       </div>
 
@@ -57,8 +64,8 @@ export default function Sidebar() {
                   className={({ isActive }) =>
                     `group relative flex items-center gap-2.5 rounded-lg px-4 py-3 font-medium duration-300 ease-in-out ${
                       isActive
-                        ? 'bg-teal-50 text-primary'
-                        : 'text-gray-600 hover:bg-gray-50'
+                        ? 'bg-slate-800 text-teal-400 border-r-4 border-teal-400' // Active: Darker bg + Teal Text
+                        : 'text-gray-400 hover:bg-slate-800 hover:text-white'     // Inactive: Gray Text
                     }`
                   }
                 >
@@ -71,11 +78,11 @@ export default function Sidebar() {
         </nav>
       </div>
 
-      {/* Logout Button (at bottom) */}
-      <div className="mt-auto p-6 border-t border-gray-100">
+      {/* Logout Button */}
+      <div className="mt-auto p-6 border-t border-slate-800">
         <button
           onClick={handleLogout}
-          className="flex w-full items-center gap-2.5 rounded-lg px-4 py-3 text-red-500 hover:bg-red-50 transition font-medium"
+          className="flex w-full items-center gap-2.5 rounded-lg px-4 py-3 text-red-400 hover:bg-slate-800 hover:text-red-300 transition font-medium"
         >
           <LogOut size={20} />
           Logout
